@@ -1,0 +1,282 @@
+#include<iostream>
+#include<fstream>
+#include<string>
+#include <stack>
+#include <sstream>
+#include<regex>
+using namespace std;
+
+#define OP 0
+#define NUM 1
+#define VAR 2
+
+class Tree{
+	class Node
+	{
+	public:
+		int kind;//OP or NUM or VAR
+		int key;
+		char op;
+		string var;
+		Node* left=nullptr;
+		Node* right=nullptr;
+		Node(int key)//num
+		{
+			kind = NUM;
+			this->key = key;
+		}
+		Node(string var)//var
+		{
+			kind = VAR;
+			this->var = var;
+		}
+		Node(char op)//op
+		{
+			kind = OP;
+			this->op = op;
+		}
+	};
+	Node* root;//tree
+public:
+	Tree()
+	{
+		root = nullptr;
+	}
+	~Tree()
+	{
+		freeNode(root);
+	}
+	void freeNode(Node* leaf)
+	{
+		if (leaf)//leaf!=nullptr
+		{
+			freeNode(leaf->left);
+			freeNode(leaf->right);
+			delete leaf;
+		}
+	}
+	Node* getRoot()
+	{
+		return root;
+	}
+	void getAnswer()
+	{
+		optimize(root);
+		if (root->kind == NUM)
+			cout << "The answer is " << root->key << endl;
+		else
+			cout << "The answer is " << root->var << endl;
+	}
+	void optimize(Node* node)//root
+	{
+		if (node->kind == OP)
+		{
+			Node* left = node->left;
+			Node* right = node->right;
+
+			//it's done
+			if (left->kind == OP || right->kind == OP)//if one of children is op
+			{
+				optimize(left);
+				optimize(right);
+				optimize(node);
+			}
+			//it's done
+			else if (left->kind == NUM && right->kind == NUM)//if both children are num
+			{
+				node->kind = NUM;//turn op into num
+				switch (node->op)
+				{
+				case '+': 
+					node->key = left->key + right->key;
+					break;
+				case '-': node->key = left->key - right->key;
+					break;
+				case '*': node->key = left->key * right->key;
+					break;
+				case '/': node->key = left->key / right->key;
+					break;
+				case '^': node->key = (int)pow(left->key, right->key);
+					break;
+				case '%': node->key = left->key % right->key;
+					break;
+				}
+			}
+			//it's done
+			else if ((left->kind == NUM && right->kind == VAR) || (left->kind == VAR && right->kind == NUM))//if one is num another is var
+			{
+				if (left->kind == VAR && right->key == 1 && node->op == '*')//x*1=x
+				{
+					node->kind = VAR;
+					node->var = left->var;
+				}
+				else if (left->key == 1 && right->kind == VAR && node->op == '*')//1*x=x
+				{
+					node->kind = VAR;
+					node->var = right->var;
+				}
+				else if (left->kind == VAR && right->key == 0 && node->op == '*')//x*0=0
+				{
+					node->kind = NUM;
+					node->key = 0;
+				}
+				else if (left->key == 0 && right->kind == VAR && node->op == '*')//0*x=0
+				{
+					node->kind = NUM;
+					node->key = 0;
+				}
+				else if (left->kind == VAR && right->key == 0 && node->op == '+')//x+0=x
+				{
+					node->kind = VAR;
+					node->var = left->var;
+				}
+				else if (left->key == 0 && right->kind == VAR && node->op == '+')//0+x=x
+				{
+					node->kind = VAR;
+					node->var = right->var;
+				}
+				else//cheat x+2=x
+				{
+					node->kind = VAR;
+					if (left->kind == VAR)
+						node->var = left->var;
+					else
+						node->var = right->var;
+				}
+			}
+			//it's done
+			else if (left->kind == VAR && right->kind == VAR)//if both children are var
+			{
+				if (left->var == right->var && node->op == '-')// x - x = 0
+				{
+					node->kind = NUM;
+					node->key = 0;
+				}
+				else if (left->var == right->var && node->op == '/')// x / x = 1
+				{
+					node->kind = NUM;
+					node->key = 1;
+				}
+				else
+				{
+					node->kind = VAR;
+					node->var = left->var + node->op + right->var;
+				}
+			}
+		}
+	}
+	
+	
+	void RPN_stack(string str)//strÊÇÒ»ÐÐRPNÏÔÊ¾µÄ×Ö·û£¬Õâ¸öº¯ÊýÓÃtree¶ÔÏóµ÷ÓÃ
+	{
+		freeNode(root);//Ã¿Ò»´Î¶ÔÏóµ÷ÓÃRPNº¯Êý¶¼Òª½«¶ÔÏóÀïµÄÊ÷Çå³ý
+		istringstream iss(str);//ÕâÊÇ½«Ò»ÐÐ×Ö·û´®·Ö³ÉÈô¸É¸ö×Ö·û´®
+		string something;
+		regex op("[+,\\-,*,/,^,%]");
+		regex num("[0-9]+");
+		regex var("[A-Za-z]+");
+		stack<Node*> stack;//Here is the stack of pointers but not nodes    ÕâÊÇÖØµã£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡
+		while (iss >> something) //Èç¹ûÕâ²»ÊÇRPNÐÎÊ½,¾Í·Ö±æ²»³öÀ´
+		{
+			if (regex_match(something, num))//num
+			{
+				//ÏÈ×ª»»stringµ½int
+				string::size_type sz;  
+				int value = stol(something, &sz);
+				Node* node = new Node(value);
+				stack.push(node);
+			}
+			else if (regex_match(something, var))//var
+			{
+				Node* node = new Node(something);
+				stack.push(node);
+			}
+			else if (regex_match(something, op))//op
+			{
+				char ch = something[0];//×ª»»³Échar
+				Node* node = new Node(ch);
+				node->right = stack.top();
+				stack.pop();
+				node->left = stack.top();
+				stack.pop();
+				stack.push(node);
+				root = node;
+			}
+		}
+		stack.pop();
+	}
+	
+	
+	void inOrder(Node* n)
+	{
+		if (n)//n!=nullptr
+		{
+			inOrder(n->left);
+			if (n->kind == NUM)
+				cout << n->key << " ";
+			else if (n->kind == OP)
+				cout << n->op << " ";
+			else if (n->kind == VAR)
+				cout << n->var << " ";
+			inOrder(n->right);
+		}
+	}
+	void preOrder(Node* n)
+	{
+		if (n)//n!=nullptr
+		{
+			if (n->kind == NUM)
+				cout << n->key << " ";
+			else if (n->kind == OP)
+				cout << n->op << " ";
+			else if (n->kind == VAR)
+				cout << n->var << " ";
+			preOrder(n->left);
+			preOrder(n->right);
+		}
+	}
+	void postOrder(Node* n)
+	{
+		if (n)//n!=nullptr
+		{
+			postOrder(n->left);
+			postOrder(n->right);
+			if (n->kind == NUM)
+				cout << n->key << " ";
+			else if (n->kind == OP)
+				cout << n->op << " ";
+			else if (n->kind == VAR)
+				cout << n->var << " ";
+		}
+	}
+	
+};
+
+int main()
+{
+	ifstream f("hw8inp.dat");
+	if (!f)
+	{
+		cerr << " No hw8inp.dat file " << endl;
+		exit(1);
+	}
+	string RPN;
+	Tree tree;
+	while (getline(f, RPN))
+	{
+		cout << "The RPN is " << RPN << endl;
+		tree.RPN_stack(RPN);//·Å½østack
+		cout << "InOrder : ";
+		tree.inOrder(tree.getRoot());
+		cout << endl;
+		cout << "PreOrder : ";
+		tree.preOrder(tree.getRoot());
+		cout << endl;
+		cout << "PostOrder : ";
+		tree.postOrder(tree.getRoot());
+		cout << endl;
+		tree.getAnswer();//optimize()
+		cout << endl;
+	}
+	
+}
